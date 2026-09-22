@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="RAG Document Q&A — Ask questions about your PDF, DOC, DOCX and TXT documents." />
+  <title>RAG Based Document Q&A</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true"></span>
+        <span class="brand-name">RAG Document Q&A</span>
+      </div>
+      <div class="nav-actions">
+        <button type="button" class="btn-theme" id="themeBtn" title="Toggle theme" aria-label="Toggle light/dark theme">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z"/>
+          </svg>
+        </button>
+        <button type="button" class="nav-about-btn" id="aboutBtn" aria-label="About">About</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="chat-container">
+      <div class="current-doc-bar empty" id="currentDocBar">
+        <span class="current-doc-label" id="currentDocLabel">No document selected</span>
+      </div>
+
+      <div class="messages" id="messages" role="log" aria-live="polite">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">📚</div>
+          <p class="empty-title" id="emptyTitle">Upload a document to get started</p>
+          <p class="empty-text" id="emptyText">
+            Upload a PDF, DOC, DOCX or TXT file, select it, then ask questions.
+          </p>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-row">
+          <button type="button" class="btn-icon btn-plus" id="openDocsBtn" title="Manage documents" aria-label="Open documents">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <div class="input-wrap">
+            <textarea id="questionInput" rows="1" placeholder="Ask a question about the selected document..." aria-label="Question" maxlength="2000"></textarea>
+          </div>
+          <button type="button" class="btn-send" id="sendBtn" title="Send" aria-label="Send question" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <p class="input-hint" id="inputHint">Select a document first</p>
+      </div>
+    </div>
+  </main>
+
+  <div class="drawer-overlay" id="docsOverlay" hidden></div>
+  <aside class="drawer docs-drawer" id="docsDrawer" aria-hidden="true">
+    <div class="drawer-header">
+      <h2>Documents</h2>
+      <button type="button" class="btn-close" id="closeDocsBtn" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden />
+        <button type="button" class="btn-upload" id="uploadBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Upload document
+        </button>
+        <p class="upload-formats">Supported: PDF, DOC, DOCX, TXT</p>
+      </div>
+      <div class="docs-section">
+        <div class="docs-section-header">
+          <h3>Uploaded</h3>
+          <button type="button" class="btn-text danger" id="deleteSelectedBtn" hidden>Delete selected</button>
+        </div>
+        <ul class="docs-list" id="docsList"></ul>
+        <p class="docs-empty" id="docsEmpty">No documents yet. Upload one above.</p>
+      </div>
+    </div>
+  </aside>
+
+  <div class="drawer-overlay" id="aboutOverlay" hidden></div>
+  <aside class="drawer about-drawer" id="aboutDrawer" aria-hidden="true">
+    <div class="drawer-header">
+      <h2>About</h2>
+      <button type="button" class="btn-close" id="closeAboutBtn" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-body about-body">
+      <h3 class="about-title">RAG Document Q&A</h3>
+      <p class="about-desc">
+        A Retrieval-Augmented Generation (RAG) application that lets you upload documents and ask questions grounded in their content.
+      </p>
+      <h4>What is RAG?</h4>
+      <p>
+        RAG combines document retrieval with a large language model. Relevant text chunks are retrieved from your selected document and passed as context so the model answers based on real content instead of guessing.
+      </p>
+      <h4>Technologies</h4>
+      <ul class="tech-list">
+        <li>Frontend: HTML5, CSS3, Vanilla JavaScript</li>
+        <li>Backend: Python, Flask</li>
+        <li>Embeddings: Sentence Transformers</li>
+        <li>Vector search: FAISS</li>
+        <li>LLM: Groq API</li>
+      </ul>
+      <a href="https://github.com/faraz721" target="_blank" rel="noopener noreferrer" class="btn-github">
+        <svg class="github-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        GitHub · FARAZ721
+      </a>
+    </div>
+  </aside>
+
+  <div class="modal-overlay" id="deleteModal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="deleteModalTitle">
+      <h3 id="deleteModalTitle">Delete documents?</h3>
+      <p id="deleteModalText">Are you sure you want to delete the selected documents? This cannot be undone.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden role="status"></div>
+  <script src="/js/app.js"></script>
+</body>
+</html>
