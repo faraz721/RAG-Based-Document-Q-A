@@ -4,7 +4,6 @@
   function initApp() {
     console.log("[RAG Q&A] JavaScript loaded and initializing...");
 
-    // --- Session (temporary files per browser; expire after idle TTL on server) ---
     var SESSION_KEY = "rag-qa-session-id";
     function getSessionId() {
       var id = localStorage.getItem(SESSION_KEY);
@@ -17,11 +16,39 @@
     function apiHeaders(extra) {
       var h = { "X-Session-Id": getSessionId() };
       if (extra) {
-        for (var k in extra) h[k] = extra[k];
+        for (var k in extra) {
+          if (Object.prototype.hasOwnProperty.call(extra, k)) h[k] = extra[k];
+        }
       }
       return h;
     }
 
+    function safeParseJson(res) {
+      return res.text().then(function (text) {
+        var trimmed = (text || "").trim();
+        if (!trimmed) {
+          throw new Error("Empty response from server. Please try again in a moment.");
+        }
+        if (trimmed.charAt(0) === "<") {
+          throw new Error(
+            "Server is waking up or busy. Please wait 20–30 seconds and refresh the page."
+          );
+        }
+        try {
+          return { res: res, data: JSON.parse(trimmed) };
+        } catch (err) {
+          throw new Error("Invalid server response. Please refresh the page.");
+        }
+      });
+    }
+
+    function apiFetch(url, options) {
+      options = options || {};
+      options.headers = apiHeaders(options.headers || {});
+      return fetch(url, options).then(function (res) {
+        return safeParseJson(res);
+      });
+    }
 
     // Theme
     var THEME_KEY = "rag-qa-theme";
@@ -50,7 +77,9 @@
     var isProcessing = false;
     var pendingDeleteIds = [];
 
-    var $ = function (sel) { return document.querySelector(sel); };
+    var $ = function (sel) {
+      return document.querySelector(sel);
+    };
 
     var messagesEl = $("#messages");
     var emptyState = $("#emptyState");
@@ -94,8 +123,10 @@
       clearTimeout(showToast._t);
       showToast._t = setTimeout(function () {
         toast.classList.remove("visible");
-        setTimeout(function () { toast.hidden = true; }, 300);
-      }, 3200);
+        setTimeout(function () {
+          toast.hidden = true;
+        }, 300);
+      }, 4000);
     }
 
     function openDrawer(drawer, overlay) {
@@ -112,19 +143,30 @@
       drawer.classList.remove("open");
       overlay.classList.remove("visible");
       drawer.setAttribute("aria-hidden", "true");
-      setTimeout(function () { overlay.hidden = true; }, 300);
+      setTimeout(function () {
+        overlay.hidden = true;
+      }, 300);
     }
 
-    function openDocs() { openDrawer(docsDrawer, docsOverlay); }
-    function closeDocs() { closeDrawer(docsDrawer, docsOverlay); }
-    function openAbout() { openDrawer(aboutDrawer, aboutOverlay); }
-    function closeAbout() { closeDrawer(aboutDrawer, aboutOverlay); }
+    function openDocs() {
+      openDrawer(docsDrawer, docsOverlay);
+    }
+    function closeDocs() {
+      closeDrawer(docsDrawer, docsOverlay);
+    }
+    function openAbout() {
+      openDrawer(aboutDrawer, aboutOverlay);
+    }
+    function closeAbout() {
+      closeDrawer(aboutDrawer, aboutOverlay);
+    }
 
     function openDeleteModal(ids) {
       pendingDeleteIds = ids;
-      var text = ids.length === 1
-        ? "Are you sure you want to delete this document? This cannot be undone."
-        : "Are you sure you want to delete " + ids.length + " documents? This cannot be undone.";
+      var text =
+        ids.length === 1
+          ? "Are you sure you want to delete this document? This cannot be undone."
+          : "Are you sure you want to delete " + ids.length + " documents? This cannot be undone.";
       var modalText = $("#deleteModalText");
       if (modalText) modalText.textContent = text;
       if (deleteModal) {
@@ -155,7 +197,10 @@
       }
       var doc = null;
       for (var i = 0; i < documents.length; i++) {
-        if (documents[i].id === selectedDocId) { doc = documents[i]; break; }
+        if (documents[i].id === selectedDocId) {
+          doc = documents[i];
+          break;
+        }
       }
       if (!doc) {
         selectedDocId = null;
@@ -163,15 +208,19 @@
         return;
       }
       currentDocBar.classList.remove("empty");
-      currentDocLabel.textContent = "📄 Current document: " + (doc.original_name || doc.filename);
+      currentDocLabel.textContent =
+        "📄 Current document: " + (doc.original_name || doc.filename);
       if (inputHint) inputHint.textContent = "Press Enter to send";
-      if (sendBtn) sendBtn.disabled = isProcessing || !(questionInput && questionInput.value.trim());
+      if (sendBtn)
+        sendBtn.disabled =
+          isProcessing || !(questionInput && questionInput.value.trim());
       updateEmptyState();
     }
 
     function updateEmptyState() {
       if (!emptyState) return;
-      var hasMessages = messagesEl && messagesEl.querySelectorAll(".msg").length > 0;
+      var hasMessages =
+        messagesEl && messagesEl.querySelectorAll(".msg").length > 0;
       if (hasMessages) {
         emptyState.style.display = "none";
         return;
@@ -179,25 +228,35 @@
       emptyState.style.display = "block";
       if (documents.length === 0) {
         if (emptyTitle) emptyTitle.textContent = "Upload a document to get started";
-        if (emptyText) emptyText.textContent = "Upload a PDF, DOC, DOCX or TXT file, select it, then ask questions.";
+        if (emptyText)
+          emptyText.textContent =
+            "Upload a PDF, DOC, DOCX or TXT file, select it, then ask questions.";
       } else if (!selectedDocId) {
-        if (emptyTitle) emptyTitle.textContent = "Select a document to start asking questions";
-        if (emptyText) emptyText.textContent = "Open the documents panel (+) and choose one document for Q&A.";
+        if (emptyTitle)
+          emptyTitle.textContent = "Select a document to start asking questions";
+        if (emptyText)
+          emptyText.textContent =
+            "Open the documents panel (+) and choose one document for Q&A.";
       } else {
         if (emptyTitle) emptyTitle.textContent = "Ask a question";
-        if (emptyText) emptyText.textContent = "Type a question about the selected document below.";
+        if (emptyText)
+          emptyText.textContent =
+            "Type a question about the selected document below.";
       }
     }
 
     function autoResizeTextarea() {
       if (!questionInput) return;
       questionInput.style.height = "auto";
-      questionInput.style.height = Math.min(questionInput.scrollHeight, 120) + "px";
+      questionInput.style.height =
+        Math.min(questionInput.scrollHeight, 120) + "px";
     }
 
     function scrollToBottom() {
       if (!messagesEl) return;
-      requestAnimationFrame(function () { messagesEl.scrollTop = messagesEl.scrollHeight; });
+      requestAnimationFrame(function () {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
     }
 
     function escapeHtml(str) {
@@ -221,24 +280,40 @@
       html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
       html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
       html = html.replace(/((?:^[\-\*•] .+(?:\n|$))+)/gm, function (block) {
-        var items = block.trim().split("\n").map(function (line) {
-          return "<li>" + line.replace(/^[\-\*•] /, "") + "</li>";
-        }).join("");
+        var items = block
+          .trim()
+          .split("\n")
+          .map(function (line) {
+            return "<li>" + line.replace(/^[\-\*•] /, "") + "</li>";
+          })
+          .join("");
         return "<ul>" + items + "</ul>";
       });
       html = html.replace(/((?:^\d+\. .+(?:\n|$))+)/gm, function (block) {
-        var items = block.trim().split("\n").map(function (line) {
-          return "<li>" + line.replace(/^\d+\. /, "") + "</li>";
-        }).join("");
+        var items = block
+          .trim()
+          .split("\n")
+          .map(function (line) {
+            return "<li>" + line.replace(/^\d+\. /, "") + "</li>";
+          })
+          .join("");
         return "<ol>" + items + "</ol>";
       });
       var parts = html.split(/\n{2,}/);
-      html = parts.map(function (p) {
-        p = p.trim();
-        if (!p) return "";
-        if (p.indexOf("<h") === 0 || p.indexOf("<ul") === 0 || p.indexOf("<ol") === 0 || p.indexOf("<pre") === 0) return p;
-        return "<p>" + p.replace(/\n/g, "<br>") + "</p>";
-      }).join("");
+      html = parts
+        .map(function (p) {
+          p = p.trim();
+          if (!p) return "";
+          if (
+            p.indexOf("<h") === 0 ||
+            p.indexOf("<ul") === 0 ||
+            p.indexOf("<ol") === 0 ||
+            p.indexOf("<pre") === 0
+          )
+            return p;
+          return "<p>" + p.replace(/\n/g, "<br>") + "</p>";
+        })
+        .join("");
       return html;
     }
 
@@ -266,12 +341,20 @@
           return t;
         });
         var unique = [];
-        parts.forEach(function (p) { if (unique.indexOf(p) === -1) unique.push(p); });
-        sourcesHtml = '<div class="sources">' + unique.map(function (p) {
-          return "<span>" + escapeHtml(p) + "</span>";
-        }).join("") + "</div>";
+        parts.forEach(function (p) {
+          if (unique.indexOf(p) === -1) unique.push(p);
+        });
+        sourcesHtml =
+          '<div class="sources">' +
+          unique
+            .map(function (p) {
+              return "<span>" + escapeHtml(p) + "</span>";
+            })
+            .join("") +
+          "</div>";
       }
-      div.innerHTML = '<div class="bubble">' + htmlContent + sourcesHtml + "</div>";
+      div.innerHTML =
+        '<div class="bubble">' + htmlContent + sourcesHtml + "</div>";
       messagesEl.appendChild(div);
       scrollToBottom();
     }
@@ -282,7 +365,8 @@
       var div = document.createElement("div");
       div.className = "msg ai";
       div.id = "thinkingMsg";
-      div.innerHTML = '<div class="bubble thinking"><span>AI is thinking</span><span class="thinking-dots"><span></span><span></span><span></span></span></div>';
+      div.innerHTML =
+        '<div class="bubble thinking"><span>AI is thinking</span><span class="thinking-dots"><span></span><span></span><span></span></span></div>';
       messagesEl.appendChild(div);
       scrollToBottom();
     }
@@ -292,21 +376,31 @@
       if (t) t.remove();
     }
 
-    function fetchDocuments() {
-      return fetch(API.list, { headers: apiHeaders() })
-        .then(function (res) {
-          return res.json().then(function (data) {
-            if (!res.ok) throw new Error(data.error || "Failed to load documents");
-            return data;
-          });
-        })
-        .then(function (data) {
-          documents = data.documents || [];
+    function fetchDocuments(retry) {
+      return apiFetch(API.list)
+        .then(function (result) {
+          if (!result.res.ok) {
+            throw new Error(
+              result.data.error || "Failed to load documents"
+            );
+          }
+          documents = result.data.documents || [];
           renderDocsList();
           updateCurrentDocBar();
         })
         .catch(function (e) {
           console.warn("[RAG Q&A] list docs:", e.message);
+          if (!retry) {
+            // one automatic retry after cold-start delay
+            setTimeout(function () {
+              fetchDocuments(true);
+            }, 2500);
+            showToast(
+              e.message || "Connecting to server… retrying shortly",
+              "error"
+            );
+            return;
+          }
           showToast(e.message || "Failed to load documents", "error");
         });
     }
@@ -323,27 +417,42 @@
 
       documents.forEach(function (doc) {
         var li = document.createElement("li");
-        li.className = "doc-item" + (doc.id === selectedDocId ? " selected-qa" : "");
+        li.className =
+          "doc-item" + (doc.id === selectedDocId ? " selected-qa" : "");
         if (doc.status === "processing") li.classList.add("processing");
 
         var name = doc.original_name || doc.filename || "Document";
-        var meta = (doc.num_chunks ? doc.num_chunks + " chunks" : "") +
-          (doc.extension ? " · " + doc.extension.toUpperCase().replace(".", "") : "");
+        var meta =
+          (doc.num_chunks ? doc.num_chunks + " chunks" : "") +
+          (doc.extension
+            ? " · " + doc.extension.toUpperCase().replace(".", "")
+            : "");
 
         li.innerHTML =
-          '<input type="radio" class="doc-radio" name="qaDoc" value="' + escapeHtml(doc.id) + '" ' +
-          (doc.id === selectedDocId ? "checked" : "") + ' title="Select for Q&A" />' +
-          '<input type="checkbox" class="doc-check" value="' + escapeHtml(doc.id) + '" title="Select for deletion" />' +
-          '<div class="doc-info"><div class="doc-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) +
-          '</div><div class="doc-meta">' + escapeHtml(meta) + '</div></div>' +
-          '<button type="button" class="doc-delete" data-id="' + escapeHtml(doc.id) + '" title="Delete" aria-label="Delete">' +
+          '<input type="radio" class="doc-radio" name="qaDoc" value="' +
+          escapeHtml(doc.id) +
+          '" ' +
+          (doc.id === selectedDocId ? "checked" : "") +
+          ' title="Select for Q&A" />' +
+          '<input type="checkbox" class="doc-check" value="' +
+          escapeHtml(doc.id) +
+          '" title="Select for deletion" />' +
+          '<div class="doc-info"><div class="doc-name" title="' +
+          escapeHtml(name) +
+          '">' +
+          escapeHtml(name) +
+          '</div><div class="doc-meta">' +
+          escapeHtml(meta) +
+          "</div></div>" +
+          '<button type="button" class="doc-delete" data-id="' +
+          escapeHtml(doc.id) +
+          '" title="Delete" aria-label="Delete">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
 
         var radio = li.querySelector(".doc-radio");
         radio.addEventListener("change", function () {
           if (radio.checked) {
             selectedDocId = doc.id;
-            // Keep chat history when switching documents
             updateCurrentDocBar();
             renderDocsList();
             showToast("Selected: " + name, "success");
@@ -371,7 +480,9 @@
 
     function clearChatMessages() {
       if (!messagesEl) return;
-      messagesEl.querySelectorAll(".msg").forEach(function (m) { m.remove(); });
+      messagesEl.querySelectorAll(".msg").forEach(function (m) {
+        m.remove();
+      });
       updateEmptyState();
     }
 
@@ -393,19 +504,16 @@
         uploadBtn.innerHTML = '<span class="spinner"></span> Processing...';
       }
 
-      fetch(API.upload, { method: "POST", body: form, headers: apiHeaders() })
-        .then(function (res) {
-          return res.json().then(function (data) {
-            if (!res.ok) throw new Error(data.error || "Upload failed");
-            return data;
-          });
-        })
-        .then(function (data) {
+      apiFetch(API.upload, { method: "POST", body: form })
+        .then(function (result) {
+          if (!result.res.ok) {
+            throw new Error(result.data.error || "Upload failed");
+          }
           showToast("Document uploaded and processed", "success");
-          return fetchDocuments().then(function () {
-            if (data.document && data.document.id) {
+          return fetchDocuments(true).then(function () {
+            if (result.data.document && result.data.document.id) {
               if (!selectedDocId || documents.length === 1) {
-                selectedDocId = data.document.id;
+                selectedDocId = result.data.document.id;
                 updateCurrentDocBar();
                 renderDocsList();
               }
@@ -427,24 +535,27 @@
 
     function deleteDocs(ids) {
       if (!ids.length) return;
-      fetch(API.delete, {
+      apiFetch(API.delete, {
         method: "POST",
-        headers: apiHeaders({ "Content-Type": "application/json" }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doc_ids: ids }),
       })
-        .then(function (res) {
-          return res.json().then(function (data) {
-            if (!res.ok) throw new Error(data.error || "Delete failed");
-            return data;
-          });
-        })
-        .then(function (data) {
+        .then(function (result) {
+          if (!result.res.ok) {
+            throw new Error(result.data.error || "Delete failed");
+          }
+          var data = result.data;
           if (ids.indexOf(selectedDocId) !== -1) {
             selectedDocId = null;
             clearChatMessages();
           }
-          showToast(data.count === 1 ? "Document deleted" : data.count + " documents deleted", "success");
-          return fetchDocuments();
+          showToast(
+            data.count === 1
+              ? "Document deleted"
+              : data.count + " documents deleted",
+            "success"
+          );
+          return fetchDocuments(true);
         })
         .catch(function (e) {
           showToast(e.message || "Delete failed", "error");
@@ -470,49 +581,66 @@
       appendUserMessage(question);
       appendThinking();
 
-      fetch(API.ask, {
+      apiFetch(API.ask, {
         method: "POST",
-        headers: apiHeaders({ "Content-Type": "application/json" }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doc_id: selectedDocId, question: question }),
       })
-        .then(function (res) {
-          return res.json().then(function (data) {
-            return { res: res, data: data };
-          });
-        })
         .then(function (result) {
           removeThinking();
           if (!result.res.ok) {
-            appendAIMessage("<p>" + escapeHtml(result.data.error || "Something went wrong.") + "</p>");
+            appendAIMessage(
+              "<p>" +
+                escapeHtml(result.data.error || "Something went wrong.") +
+                "</p>"
+            );
             return;
           }
-          var html = renderMarkdown(result.data.answer || "No answer generated.");
+          var html = renderMarkdown(
+            result.data.answer || "No answer generated."
+          );
           appendAIMessage(html, result.data.sources);
         })
-        .catch(function () {
+        .catch(function (e) {
           removeThinking();
-          appendAIMessage("<p>Network error. Please check your connection and try again.</p>");
+          appendAIMessage(
+            "<p>" +
+              escapeHtml(
+                e.message ||
+                  "Network error. Please check your connection and try again."
+              ) +
+              "</p>"
+          );
         })
         .finally(function () {
           isProcessing = false;
           if (sendBtn) {
-            sendBtn.disabled = !(questionInput && questionInput.value.trim()) || !selectedDocId;
+            sendBtn.disabled =
+              !(questionInput && questionInput.value.trim()) || !selectedDocId;
           }
         });
     }
 
-    // Events
-    aboutBtn.addEventListener("click", function (e) { e.preventDefault(); openAbout(); });
-    openDocsBtn.addEventListener("click", function (e) { e.preventDefault(); openDocs(); });
+    aboutBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      openAbout();
+    });
+    openDocsBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      openDocs();
+    });
     if (closeDocsBtn) closeDocsBtn.addEventListener("click", closeDocs);
     if (docsOverlay) docsOverlay.addEventListener("click", closeDocs);
     if (closeAboutBtn) closeAboutBtn.addEventListener("click", closeAbout);
     if (aboutOverlay) aboutOverlay.addEventListener("click", closeAbout);
 
     if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener("click", function () { fileInput.click(); });
+      uploadBtn.addEventListener("click", function () {
+        fileInput.click();
+      });
       fileInput.addEventListener("change", function () {
-        if (fileInput.files && fileInput.files[0]) uploadFile(fileInput.files[0]);
+        if (fileInput.files && fileInput.files[0])
+          uploadFile(fileInput.files[0]);
       });
     }
 
@@ -521,24 +649,30 @@
         e.preventDefault();
         uploadZone.classList.add("dragover");
       });
-      uploadZone.addEventListener("dragleave", function () { uploadZone.classList.remove("dragover"); });
+      uploadZone.addEventListener("dragleave", function () {
+        uploadZone.classList.remove("dragover");
+      });
       uploadZone.addEventListener("drop", function (e) {
         e.preventDefault();
         uploadZone.classList.remove("dragover");
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files && e.dataTransfer.files[0])
+          uploadFile(e.dataTransfer.files[0]);
       });
     }
 
     if (deleteSelectedBtn) {
       deleteSelectedBtn.addEventListener("click", function () {
-        var ids = Array.prototype.slice.call(docsList.querySelectorAll(".doc-check:checked")).map(function (c) {
-          return c.value;
-        });
+        var ids = Array.prototype.slice
+          .call(docsList.querySelectorAll(".doc-check:checked"))
+          .map(function (c) {
+            return c.value;
+          });
         if (ids.length) openDeleteModal(ids);
       });
     }
 
-    if (cancelDeleteBtn) cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+    if (cancelDeleteBtn)
+      cancelDeleteBtn.addEventListener("click", closeDeleteModal);
     if (confirmDeleteBtn) {
       confirmDeleteBtn.addEventListener("click", function () {
         var ids = pendingDeleteIds.slice();
@@ -556,7 +690,9 @@
     if (questionInput) {
       questionInput.addEventListener("input", function () {
         autoResizeTextarea();
-        if (sendBtn) sendBtn.disabled = isProcessing || !questionInput.value.trim() || !selectedDocId;
+        if (sendBtn)
+          sendBtn.disabled =
+            isProcessing || !questionInput.value.trim() || !selectedDocId;
       });
       questionInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -569,12 +705,14 @@
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
         if (deleteModal && !deleteModal.hidden) closeDeleteModal();
-        else if (docsDrawer && docsDrawer.classList.contains("open")) closeDocs();
-        else if (aboutDrawer && aboutDrawer.classList.contains("open")) closeAbout();
+        else if (docsDrawer && docsDrawer.classList.contains("open"))
+          closeDocs();
+        else if (aboutDrawer && aboutDrawer.classList.contains("open"))
+          closeAbout();
       }
     });
 
-    fetchDocuments();
+    fetchDocuments(false);
     updateCurrentDocBar();
     console.log("[RAG Q&A] Ready");
   }
